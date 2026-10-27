@@ -1,0 +1,97 @@
+# Tools
+
+Helper utilities for uploading scripts to Shelly devices and maintaining the
+example manifest.
+
+## put_script.py
+
+Upload a script to a Shelly device. Performs a full lifecycle: stop the running
+script, upload new code in chunks, then start it.
+
+Requirements:
+- Python 3 (no external dependencies)
+
+Usage:
+```
+python tools/put_script.py <device-ip> <script-id> <script-file>
+```
+
+Example:
+```
+python tools/put_script.py 192.168.33.1 1 ble/ble-shelly-motion.shelly.js
+```
+
+Workflow:
+1. Stops the script in the given slot (`Script.Stop`)
+2. Uploads the file in 1024-byte chunks (`Script.PutCode`)
+3. Starts the script (`Script.Start`)
+
+Notes:
+- The script slot (`script-id`) must already exist on the device.
+- Exits with error on HTTP or RPC failures.
+
+## check-manifest-integrity.py
+
+Validate the integrity of `examples-manifest.json` for CI/CD. This script is
+check-only and does not modify any files. Exit code 0 means all checks passed,
+exit code 1 means errors were found.
+
+Usage:
+```
+python tools/check-manifest-integrity.py
+python tools/check-manifest-integrity.py --check-headers --check-indent --check-sync
+```
+
+Defaults:
+- Manifest file: `examples-manifest.json` in the repository root
+- Base directory: directory containing the manifest file
+
+Options:
+- `--base-dir <path>` — Override the base directory for script file lookups
+- `--check-docs` — Verify that `doc` files exist (if specified in entries)
+- `--check-headers` — Check scripts for standard headers (`@title`, `@description`, `@status`, `@link`)
+- `--check-indent` — Check scripts for proper 2-space indentation (detects tabs and odd spaces)
+- `--check-sync` — Check that all production `.shelly.js` files are in the manifest and no non-production files are listed
+
+Checks performed:
+- All `fname` script files exist on disk
+- All entries have non-empty `title` field
+- All entries have non-empty `description` field
+- (Optional) All `doc` files exist
+- (Optional) Script files have standard headers with valid `@status` and `@link` tags
+- (Optional) Script files use 2-space indentation
+- (Optional) Manifest and disk files are in sync
+
+Standard header format (first block in file):
+```javascript
+/**
+ * @title Script Title Here
+ * @description Description of what the script does.
+ * @status production
+ * @link https://github.com/ALLTERCO/shelly-script-examples/blob/main/path/to/file.shelly.js
+ */
+```
+
+## sync-manifest-md.py
+
+Synchronize `examples-manifest.json` with `.shelly.js` files in the repository.
+Only includes files with `@status production` in their JSDoc header. Files with
+other statuses are skipped and removed from the manifest if previously included.
+
+Usage:
+```
+python tools/sync-manifest-md.py
+python tools/sync-manifest-md.py --dry-run
+python tools/sync-manifest-md.py --remove-missing
+```
+
+Options:
+- `--dry-run` — Show what would be done without making changes
+- `--remove-missing` — Remove manifest entries for files that no longer exist
+- `--extract-metadata` — Try to extract title/description from file comments
+
+Workflow:
+1. Run with `--dry-run` to see what changes would be made
+2. Run without flags to update the manifest
+3. Edit the manifest to fill in proper titles and descriptions for new entries
+4. Run `check-manifest-integrity.py --check-headers --check-sync`

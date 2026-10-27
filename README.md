@@ -1,64 +1,81 @@
 # Shelly Script Examples
+
 This project contains example Shelly Script solutions.
 
 Initial support for Shelly Script comes with firmware version 0.9, September
 2021 for Gen2 Shellies based on ESP32.
 
-# Changelog
-## 2024-08
-- New user script (switch-better-power-led-colors.js): Multiple ring LED colors depending on the current power consumption
-## 2024-06
-- Advanced Load shedding with schedules and notifications
-- Add a second meter to advanced load shedding with a companion script
-- Monitor Power Outages or Crashed Services
-- Updated N-Way Dimmer with JSON fix and documentation
-## 2024-04
-- Load shedding with Shelly Pro4PM and Pro3EM
-## 2023-11
-- NTC Conversion example
-## 2023-09
-- Shelly BLU Motion script example
-## 2023-08
-- Telegram interaction with Shelly script
-## 2023-06
-- BLE scanner examples - Aranet2 support
-## 2023-05
-- BLE scanner examples - Shelly BLU (refactored solution)
-- BLE events handler - Scene Manager
-- Push notifications example
-## 2023-04
-- BLE scanner examples - Aranet4 support
-- Gateway between Shelly BLU button1 and other devices
-## 2023-03
-- shell script for uploading scripts on linux and mac
-- http handler example
-## 2022-12
-- Shelly BLU Button example
-- Shelly BLU Door Window example
-## 2022-11
-- BLE scanner examples - ruuvi and b-parasite support
+## Who is this for?
 
-## 2022-09
-- Schedule usage scripts and schedule registering scripts
-## 2022-03
-- HomeAssistant MQTT discovery of sensors
+This repository is designed for:
 
-## 2022-01
+- **Home automation enthusiasts** - Looking to extend Shelly device capabilities beyond the default features
+- **Smart home integrators** - Building custom solutions with Shelly devices for clients
+- **Developers** - Learning Shelly scripting through practical, working examples
+- **IoT hobbyists** - Experimenting with BLE sensors, MQTT, LoRa, and other protocols
+- **Energy-conscious users** - Implementing load shedding, power monitoring, and efficiency solutions
 
-### Added
-- HomeAssistant MQTT discovery example
-- activation_switch behavior replicated in script
+**Prerequisites:**
+- Basic understanding of JavaScript
+- Shelly Gen2 or Gen3 device with firmware 0.9+
+- Access to the Shelly web interface or app for script deployment
 
-## 2021-11
+## Documentation
 
-### Added
-- Updated wifi-provision to include support for Gen1 devices
-- Added relay control based on weather service temperature reading
-- Router Watchdog script
-- Building block snippets
+- [Example Manifest](examples-manifest.json) - Machine-readable list of production examples, descriptions, and tags
+- [Changelog](CHANGELOG.md) - See what's new
+- [Contributing](CONTRIBUTING.md) - How to contribute to this project
+- [Tools](tools/README.md) - Helper utilities for uploading scripts and validation
+- [License](LICENSE) - Apache License 2.0
+- [Shelly Script Documentation](https://shelly-api-docs.shelly.cloud/gen2/Scripts/ShellyScriptLanguageFeatures) - Official Shelly scripting docs
 
-## 2021-09
 
-### Added
-- Shelly Scripts demonstrating different script or device capabilities
-- `tools/put_script.py` for uploading scripts from the command line.
+## Virtual Component Scripts
+
+Runtime scripts that use Shelly Virtual Components should be self-contained. A user should be able to upload and start the script on a compatible device without manually creating the components first.
+
+Use `snippets/virtual-components-helper.shelly.js` as the standard mechanism:
+
+- Embed the helper as a normal code section in the standalone `.shelly.js` file. Do not copy the helper `@title`, `@description`, or `@status` metadata block into runtime scripts.
+- Define one `VIRTUAL_COMPONENTS` manifest, or a small `buildVirtualComponentsManifest()` function when the script already has an `ENTITIES`/`COMPONENTS` table.
+- Preserve fixed IDs when a README, dashboard, article, or companion script already documents `type:id` values.
+- Put groups in the manifest and reference logical component keys, not raw strings such as `number:200`.
+- Start polling, control handlers, HTTP requests, MODBUS reads, or BLE scanning only after `ensureVirtualComponents(...)` returns `ok === true`.
+- Bind handles from the callback result, for example `readyVc.handles.soc`, instead of assuming the VC already exists.
+
+The expected startup shape is:
+
+```javascript
+ensureVirtualComponents(VIRTUAL_COMPONENTS, function(ok, readyVc) {
+  if (!ok) {
+    print('ERROR: Virtual component setup failed');
+    return;
+  }
+
+  bindVirtualComponents(readyVc);
+  startApp();
+});
+```
+
+This makes each script create missing VCs, reuse matching VCs, repair mismatched fixed-ID VCs, restore group membership, and bind handles before normal logic starts.
+
+## Collections
+
+- [The Pill](the_pill/README.md) - UART peripherals and hardware integrations
+- [BLU Assistant](blu-assistant/README.md) - BLE device provisioning, configuration, and management scripts
+- [Cury](cury/README.md) - Expressive light patterns and visual feedback for Shelly Cury devices
+
+## Repository Layout
+
+- [ble/](ble/README.md) - BLE/BLU sensors, buttons, and gateways
+- [howto/](howto/README.md) - Minimal examples and tutorials
+- [http-integrations/](http-integrations/README.md) - HTTP endpoints, notifications, and external services
+- [lora/](lora/README.md) - LoRa send/receive and device control examples
+- [lnm/](lnm/README.md) - Local Network Messaging automations between Shelly devices
+- [modbus/](modbus/README.md) - MODBUS examples for RS485 add-ons and native MODBUS clients
+- [mqtt/](mqtt/README.md) - MQTT and Home Assistant integrations
+- [networking/](networking/README.md) - Provisioning and watchdog scripts
+- [power-energy/](power-energy/README.md) - Load management, power thresholds, and monitoring
+- [scheduling/](scheduling/README.md) - Scheduling, scenes, and orchestration
+- [switch-input/](switch-input/README.md) - Input handling, switch behavior, and cover control
+- [weather-env/](weather-env/README.md) - Weather and environmental sensor integrations

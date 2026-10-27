@@ -1,0 +1,119 @@
+/**
+ * @title MQTT Auto Discovery in Home Assistant
+ * @description This script is registering a virtual switch device in HA. The
+ *   implementation is banal and directly reports switch state and controls
+ *   a switch, but you can have a totally different virtual device: valve,
+ *   light, scene. Note: Requires configuration.yaml change in HA, please
+ *   refer to the comments in the code of this file.
+ * @status production
+ * @link https://github.com/ALLTERCO/shelly-script-examples/blob/main/mqtt/mqtt-discovery.shelly.js
+ */
+
+// Shelly Script example: MQTT Auto Discovery in Home Assistant
+//
+// This script is registering a virtual switch device in HA
+// The implementation is banal and directly reports switch state and controls a switch
+// but you can have a totally different virtual device: valve, light, scene
+// Reference:
+// https://www.home-assistant.io/docs/mqtt/discovery/
+//
+// MQTT configuration.yaml contains this section:
+// mqtt:
+//   broker: 127.0.0.1
+//   discovery: true
+//   discovery_prefix: garage_homeassistant
+
+/**
+ * @typedef {"switch" | "binary_sensor"} HADeviceType
+ * @typedef {"config"|"stat"|"cmd"} HATopicType
+ */
+
+
+const deviceInfo = Shelly.getDeviceInfo();
+const CONFIG = {
+  shelly_id: deviceInfo.id,
+  shelly_mac: deviceInfo.mac,
+  shelly_fw_id: deviceInfo.fw_id,
+  ha_mqtt_ad: "garage_homeassistant",
+  device_name: "VIRTUAL_SWITCH",
+  payloads: {
+    on: "on",
+    off: "off",
+  },
+};
+
+initMQTT();
+
+/**
+ * @param   {HADeviceType}   hatype HA device type
+ * @returns {string} topic - ha_mqtt_auto_discovery_prefix/device_type/device_id/config
+ */
+function buildMQTTConfigTopic(hatype) {
+  return CONFIG.ha_mqtt_ad + "/" + hatype + "/" + CONFIG.shelly_id + "/config";
+}
+
+/**
+ * @param   {HADeviceType}   hatype HA device type
+ * @param   {HATopicType}    topic HA topic
+ * @returns {string}
+ */
+function buildMQTTStateCmdTopics(hatype, topic) {
+  let _t = topic || "";
+  if (_t.length) {
+    _t = "/" + _t;
+  }
+  return CONFIG.shelly_id + "/" + hatype + _t;
+}
+
+/**
+ * @param {boolean} sw_state
+ */
+function switchActivate(sw_state) {
+  Shelly.call("Switch.Set", {
+    id: 0,
+    on: sw_state,
+  });
+}
+
+/**
+ * @param {string} topic
+ * @param {string} message
+ */
+function MQTTCmdListener(topic, message) {
+  let _sw_state = message === "on" ? true : false;
+  switchActivate(_sw_state);
+}
+
+// until 0.10.0 event and notifications were emitted by switch
+// after that only notification is emitted
+Shelly.addStatusHandler(function (notification) {
+  if (notification.component !== "switch:0") return;
+  if (typeof notification.delta.output === "undefined") return;
+  let _state_str = notification.delta.output ? "on" : "off";
+  MQTT.publish(buildMQTTStateCmdTopics("switch", "state"), _state_str);
+});
+
+function initMQTT() {
+  MQTT.subscribe(buildMQTTStateCmdTopics("switch", "cmd"), MQTTCmdListener);
+  MQTT.publish(
+    buildMQTTConfigTopic("switch"),
+    JSON.stringify({
+      name: CONFIG.device_name,
+      device: {
+        name: CONFIG.device_name,
+        ids: [CONFIG.device_name],
+        mdl: "virtual-Shelly",
+        mf: "Allterco",
+        sw_version: CONFIG.shelly_fw_id,
+      },
+      unique_id: CONFIG.shelly_mac + ":" + CONFIG.device_name,
+      pl_on: CONFIG.payloads.on,
+      pl_off: CONFIG.payloads.off,
+      cmd_t: "~/cmd",
+      stat_t: "~/state",
+      "~": buildMQTTStateCmdTopics("switch"),
+    }),
+    0,
+    true
+  );
+}
